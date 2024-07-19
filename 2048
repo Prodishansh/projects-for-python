@@ -1,0 +1,152 @@
+import pygame
+import numpy as np
+import random
+
+# Constants
+TILE_SIZE = 100
+BOARD_SIZE = 4
+SCREEN_WIDTH = TILE_SIZE * BOARD_SIZE
+SCREEN_HEIGHT = TILE_SIZE * BOARD_SIZE
+
+# Colors
+BACKGROUND_COLOR = (187, 173, 160)
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+TILE_COLORS = {
+    0: (204, 192, 179),
+    2: (238, 228, 218),
+    4: (237, 224, 200),
+    8: (242, 177, 121),
+    16: (245, 149, 99),
+    32: (246, 124, 95),
+    64: (246, 94, 59),
+    128: (237, 207, 114),
+    256: (237, 204, 97),
+    512: (237, 200, 80),
+    1024: (237, 197, 63),
+    2048: (237, 194, 46),
+}
+
+# Initialize the game board
+def initialize_board(size):
+    return np.zeros((size, size), dtype=int)
+
+# Add a new tile (2 or 4) to a random empty position on the board
+def add_new_tile(board):
+    empty_positions = list(zip(*np.where(board == 0)))
+    if empty_positions:
+        row, col = random.choice(empty_positions)
+        board[row, col] = random.choice([2, 4])
+
+# Check if there are any legal moves left (i.e., if the game is over)
+def is_game_over(board):
+    # Game is over if there are no empty cells and no adjacent cells with the same value
+    if np.any(board == 0):
+        return False
+    
+    # Check horizontally
+    for row in range(board.shape[0]):
+        for col in range(board.shape[1] - 1):
+            if board[row, col] == board[row, col + 1]:
+                return False
+    
+    # Check vertically
+    for col in range(board.shape[1]):
+        for row in range(board.shape[0] - 1):
+            if board[row, col] == board[row + 1, col]:
+                return False
+    
+    return True
+
+# Perform a move (up, down, left, right) on the board
+def perform_move(board, move):
+    if move == 'up':
+        board = np.rot90(board, 1)
+    elif move == 'down':
+        board = np.rot90(board, 3)
+    elif move == 'right':
+        board = np.fliplr(board)
+
+    for row in range(board.shape[0]):
+        board[row] = slide_and_merge(board[row])
+
+    if move == 'up':
+        board = np.rot90(board, 3)
+    elif move == 'down':
+        board = np.rot90(board, 1)
+    elif move == 'right':
+        board = np.fliplr(board)
+
+    return board
+
+# Slide and merge tiles in a single row
+def slide_and_merge(row):
+    non_zeros = row[row != 0]
+    new_row = np.zeros_like(row)
+    j = 0
+    skip = False
+    for i in range(len(non_zeros)):
+        if skip:
+            skip = False
+            continue
+        if i < len(non_zeros) - 1 and non_zeros[i] == non_zeros[i + 1]:
+            new_row[j] = 2 * non_zeros[i]
+            j += 1
+            skip = True
+        else:
+            new_row[j] = non_zeros[i]
+            j += 1
+    return new_row
+
+# Function to draw the game board
+def draw_board(screen, board):
+    screen.fill(BACKGROUND_COLOR)
+    for row in range(BOARD_SIZE):
+        for col in range(BOARD_SIZE):
+            tile_value = board[row, col]
+            color = TILE_COLORS.get(tile_value, WHITE)
+            pygame.draw.rect(screen, color, (col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE))
+            if tile_value != 0:
+                font = pygame.font.SysFont(None, 36)
+                text = font.render(str(tile_value), True, BLACK)
+                text_rect = text.get_rect(center=(col * TILE_SIZE + TILE_SIZE // 2, row * TILE_SIZE + TILE_SIZE // 2))
+                screen.blit(text, text_rect)
+
+# Main game loop
+def main():
+    pygame.init()
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    pygame.display.set_caption('2048 Game')
+
+    board = initialize_board(BOARD_SIZE)
+    add_new_tile(board)
+    add_new_tile(board)
+
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    board = perform_move(board, 'up')
+                elif event.key == pygame.K_DOWN:
+                    board = perform_move(board, 'down')
+                elif event.key == pygame.K_LEFT:
+                    board = perform_move(board, 'left')
+                elif event.key == pygame.K_RIGHT:
+                    board = perform_move(board, 'right')
+                add_new_tile(board)
+
+        screen.fill(WHITE)
+        draw_board(screen, board)
+        pygame.display.flip()
+
+        if is_game_over(board):
+            running = False
+            print("Game Over! Your final score:", np.max(board))
+
+    pygame.quit()
+
+if __name__ == "__main__":
+    main()
